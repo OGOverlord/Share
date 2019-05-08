@@ -4,16 +4,21 @@
 #include "myfilesystem.h"
 
 #include <pthread.h>
+#define true 1
+#define false 0
 
-struct HelpStruct{
+typedef struct HelpStruct{
    // these files are fixed in size. they will not run out of space
    FILE *file_data;
    FILE *directory_table;
    FILE *hash_data;
    int dir_size;
+   int file_size;
    int threads_max;
    int threads;
 }Help;
+
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 // this is the first function run. initialise all data structures needed.
 // Return a pointer to a memory area (void *) that you can use to store data for
@@ -29,33 +34,35 @@ void * init_fs(char * f1, char * f2, char * f3, int n_processors) {
    //set up the files. If they don't exist, it will be created
 
 
-   Help * helper = (Help*) malloc(sizeof(Help));
+   struct HelpStruct * helper = (struct HelpStruct*) malloc(sizeof(struct HelpStruct));
    helper->file_data = fopen(f1,"rb+");
    helper->directory_table = fopen(f2,"rb+");
    helper->hash_data = fopen(f3, "rb+");
    FILE* file1 = helper->file_data;
    FILE* file2 = helper->directory_table;
-   FILE* file3 = helper->hash_data;
+   //FILE* file3 = helper->hash_data;
    fseek(file2,0,SEEK_END);
    int len = ftell(file2);
    helper->dir_size = len;
+   fseek(file1,0,SEEK_END);
+   len = ftell(file1);
+   helper->file_size = len;
+   fseek(file1,0,SEEK_SET);
    fseek(file2,0,SEEK_SET);
-   helper->thread_max = n_processors;
+   helper->threads_max = n_processors;
    helper->threads = 0;
    return helper;
 }
 
 void close_fs(void * helper) {
-   fclose(helper->file_data);
-   fclose(helper->directory_table);
-   fclose(helper->hash_data);
+   fclose(((Help*)helper)->file_data);
+   fclose(((Help*)helper)->directory_table);
+   fclose(((Help*)helper)->hash_data);
    free(helper);
 }
 
 
-void truncate(char* filename){
-   char truncated[64];
-   truncated[63]='\0';
+void truncate(char* filename,char truncated[]){
    for(int i = 0; i<63; i++){
       if(strlen(filename)>i){
          truncated[i]=filename[i];
@@ -63,52 +70,12 @@ void truncate(char* filename){
          truncated[i]='\0';
       }
    }
-   return truncated;
+   truncated[63]='\0';
 }
 
 int create_file(char * filename, size_t length, void * helper) {
 
-   //int l = strlen(filename);
-   char * buf[helper->dir_size];
-   fread(buf,sizeof(char),helper->dir_size,helper->directory_table);
-
-   //check if the filename already exists
-   for(int i = 0; i< helper->dir_size;i+=72){
-      char* truncated = truncate(filename);
-      if(strncmp(buf[i],truncated,64)==0){
-         return 1;
-      }
-   }
-   //check an empty space
-   int success = -1;
-   for(int i = 0; i< helper->dir_size; i+=72){
-      if(i==0){
-         fseek(helper->directory_table,0,SEEK_SET);
-      }else{
-         fseek(helper->directory_table,72,SEEK_CUR);
-      }
-      char *test;
-      test = fgets(test, 1,helper->directory_table);
-      if(*test=='\0'){
-         success = i;
-      }
-   }
-   fseek(helper->directory_table,0,SEEK_SET);
-   if(success !=-1){
-      // just do it
-      for(int i = 0; i< 72; i++){
-         buf[72*success+i] = truncated[i];
-      }
-   }else{
-      // repack then do it.
-      if(){
-         // if it fails, then return 1;
-
-      }
-   }
-
    return 0;
-
 }
 
 int resize_file(char * filename, size_t length, void * helper) {
@@ -116,6 +83,7 @@ int resize_file(char * filename, size_t length, void * helper) {
 };
 
 void repack(void * helper) {
+
    return;
 }
 
