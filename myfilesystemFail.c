@@ -169,7 +169,11 @@ int create_file(char * filename, size_t length, void * helper) {
    printf("%x \n",buf[65]);
    printf("%x \n",buf[66]);
    printf("%x \n",buf[67]);
+   printf("%u \n",(int)buf[64]+((int)buf[65]<<8)+((int)buf[66]<<16)+((int)buf[67]<<24));
 
+
+   //NOW, it can be assumed that we found a spot in the directory file.
+   // Now, it is time to find
 
    /*int exists[((Help*)helper)->file_size];
    char offsetA[4];
