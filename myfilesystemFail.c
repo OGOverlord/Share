@@ -33,23 +33,41 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 void * init_fs(char * f1, char * f2, char * f3, int n_processors) {
    //set up the files. If they don't exist, it will be created
 
-
+   printf("Is the error here?\n");
    struct HelpStruct * helper = (struct HelpStruct*) malloc(sizeof(struct HelpStruct));
+   printf("here?\n");
+   printf("%s\n",f1);
+   printf("%s\n",f2);
+   printf("%s\n",f3);
    helper->file_data = fopen(f1,"rb+");
+   FILE* file1 = fopen(f1,"rb+");
+   FILE* file2 = fopen(f2,"rb+");
+   if (!file1){
+      printf("Unable to open file1!\n");
+   }
    helper->directory_table = fopen(f2,"rb+");
+   if (!file2){
+      printf("Unable to open file2!\n");
+   }
    helper->hash_data = fopen(f3, "rb+");
-   FILE* file1 = helper->file_data;
-   FILE* file2 = helper->directory_table;
-   //FILE* file3 = helper->hash_data;
-   fseek(file2,0,SEEK_END);
-   int len = ftell(file2);
+   printf(",here?\n");
+   char abc[1]= {'1'};
+   printf("testing fread\n");
+   fread(abc,1,1,((Help*)helper)->directory_table);
+   printf("did fread cause the issue? NO?\n");
+   printf("the value I got from fread is %x\n",abc[0]);
+   fseek(helper->directory_table,0,SEEK_END);
+   printf("after fseek?\n");
+   int len = ftell(helper->directory_table);
+   printf("after ftell?\n");
    helper->dir_size = len;
-   fseek(file1,0,SEEK_END);
-   len = ftell(file1);
+   fseek(helper->file_data,0,SEEK_END);
+   len = ftell(helper->file_data);
    helper->file_size = len;
-   fseek(file2,0,SEEK_SET);
+   fseek(helper->directory_table,0,SEEK_SET);
    helper->threads_max = n_processors;
    helper->threads = 0;
+   printf("or here?\n");
    return helper;
 }
 
@@ -72,6 +90,7 @@ void truncate(char* filename,char truncated[]){
    truncated[63]='\0';
 }
 
+
 /*
 HUGE ISSUE
 
@@ -86,16 +105,21 @@ int create_file(char * filename, size_t length, void * helper) {
    //int l = strlen(filename);
 
 
-   char buf[((Help*)helper)->dir_size];
-   char buf2[((Help*)helper)->file_size];
+   unsigned char buf[((Help*)helper)->dir_size];
+   unsigned char buf2[((Help*)helper)->file_size];
    fread(buf,sizeof(char),((Help*)helper)->dir_size,((Help*)helper)->directory_table);
    fread(buf2,sizeof(char),((Help*)helper)->file_size,((Help*)helper)->file_data);
    char truncated[64];
    truncate(filename,truncated);
-
+   //create a char buf of that one.
    //check if the filename already exists
+   char compared[64];
+   for(int i = 0; i< 63; i++){
+      compared[i]=buf[i];
+   }
+   compared[63]='\0';
    for(int i = 0; i< ((Help*)helper)->dir_size;i+=72){
-      if(strncmp(&(buf[i]),truncated,64)==0){
+      if(strncmp(&(compared[i]),truncated,64)==0){
          for(int j = 0; j< 20; j++){
             printf("%c",filename[j]);
          }
@@ -134,36 +158,57 @@ int create_file(char * filename, size_t length, void * helper) {
       }
    }
    fseek(((Help*)helper)->directory_table,0,SEEK_SET);
-   printf("%d",success);
+   printf("%d\n",success);
    //right now, we will ahve found an empty space if sucess is not 01.
 
    if(success == -1){ // if it failed, then there isn't enough space in the directory. Therefore,
       return 2;
    }
-   printf("looking ofr psace\n");
-   // now, we will look for a space in the file_data by going through the directory_table
-   int exists[((Help*)helper)->file_size];
-   size_t offset[4];
-   size_t lengthA[4];
+   printf("looking ofr space\n");
+   printf("%x \n",buf[64]);
+   printf("%x \n",buf[65]);
+   printf("%x \n",buf[66]);
+   printf("%x \n",buf[67]);
+
+
+   /*int exists[((Help*)helper)->file_size];
+   char offsetA[4];
+   char lengthA[4];
+   printf("first for loop to fill exists with false about to start \n");
    for(int i = 0; i<((Help*)helper)->file_size; i++){
       exists[i]=false;
    }
+   printf("fin\n");
+   printf("about to use loop to set the values of exists as true or false\n");
    for(int i = 0; i< ((Help*)helper)->dir_size; i+=72){
       fseek(((Help*)helper)->directory_table,72*i+64,SEEK_SET);
-      fread(offset,1,4,((Help*)helper)->directory_table);
+      fread(&offsetA[0],1,1,((Help*)helper)->directory_table);
+      fseek(((Help*)helper)->directory_table,72*i+65,SEEK_SET);
+      fread(&offsetA[1],1,1,((Help*)helper)->directory_table);
+      fseek(((Help*)helper)->directory_table,72*i+66,SEEK_SET);
+      fread(&offsetA[2],1,1,((Help*)helper)->directory_table);
+      fseek(((Help*)helper)->directory_table,72*i+67,SEEK_SET);
+      fread(&offsetA[3],1,1,((Help*)helper)->directory_table);
+      printf("i is %d\n",i);
+      printf("1st is %X\n",offsetA[0]);
+      printf("2nd is %X\n",offsetA[1]);
+      printf("3rd is %X\n",offsetA[2]);
+      printf("4th is %X\n",offsetA[3]);
       fseek(((Help*)helper)->directory_table,72*i+68,SEEK_SET);
       fread(lengthA,1,4,((Help*)helper)->directory_table);
-      int trueOffset= (int)offset[0]+(int)(offset[1]<<8)+(int)(offset[2]<<16)+(int)(offset[3]<<24);
+      printf("about to use \n");
+      int trueOffset= (int)offsetA[0]+(int)(offsetA[1]<<8)+(int)(offsetA[2]<<16)+(int)(offsetA[3]<<24);
       int trueLength = (int)lengthA[0]+(int)(lengthA[1]<<8)+(int)(lengthA[2]<<16)+(int)(lengthA[3]<<24);
       while(trueOffset<trueOffset+trueLength){
          exists[trueOffset]=true;
          trueOffset++;
       }
    }
+   printf("fin\n");
    printf("%u",exists[0]);
    fseek(((Help*)helper)->directory_table,0,SEEK_SET);
    //find an area of exists that has enough room for length
-   printf("looking for room");
+   printf("looking for room\n");
    int position = -1;
    int counter = 0;
    for(int i = 0; i < sizeof(exists)/sizeof(exists[0]);i++){
@@ -182,7 +227,7 @@ int create_file(char * filename, size_t length, void * helper) {
    // Assume that there is enough space for this test case.
    // position will now have the needed value
 
-
+*/
 
    return 0;
 }
