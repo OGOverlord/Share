@@ -12,7 +12,7 @@
 #include <errno.h>
 
 #include "myfilesystem.h"
-#include "myfilesystem.c"
+// #include "myfilesystem.c"
 
 char * file_data_file_name = NULL;
 char * directory_table_file_name = NULL;
@@ -32,6 +32,9 @@ int file_exists(char* filename, void* helper){
    FILE * dir = ((Help*)helper)->directory_table;
    FILE * files = ((Help*)helper)->file_data;
    int filesize = ((Help*)helper)->file_size;
+   int size;
+   fseek(dir, 0, SEEK_END);
+   size = ftell(dir);
    char truncated[64];
    truncate(filename,truncated);
    for(int i = 0; i< size; i++){
@@ -46,7 +49,7 @@ int file_exists(char* filename, void* helper){
 }
 
 
-fuse_get_context()->private_data; // this is the helper as a void*, (the thing returned from init)
+// fuse_get_context()->private_data; // this is the helper as a void*, (the thing returned from init)
 int myfuse_getattr(const char * name, struct stat * result) {
     // MODIFY THIS FUNCTION
     Help* helper =  (Help*)(fuse_get_context()->private_data); // this is the helper as a void*, (the thing returned from init)
@@ -123,7 +126,7 @@ struct fuse_operations operations = {
     .unlink = myfuse_unlink,
     .rename = myfuse_rename,
     .truncate = myfuse_truncate,
-    .open = myfuse_ope,
+    .open = myfuse_open,
     .read = myfuse_read,
     .write = myfuse_write,
     .release = myfuse_release,
@@ -159,7 +162,7 @@ int myfuse_rename(const char * filename, const char * newname){
 }
     // FILL OUT
 
-int myfuse_truncate(const char *filename, off_t offset){
+int myfuse_truncate(const char *filename, off_t offset){ //resize
    return 0;
 }
     // FILL OUT
