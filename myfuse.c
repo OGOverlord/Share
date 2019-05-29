@@ -78,16 +78,16 @@ int myfuse_readdir(const char * name, void * buf, fuse_fill_dir_t filler, off_t 
     return 0;
 }
 
-int myfuse_unlink(const char *); // delete
+int myfuse_unlink(const char *filename); // delete
     // FILL OUT
 // don't pass in name, pass in name+1
-int myfuse_rename(const char *, const char *);
+int myfuse_rename(const char *filename, const char * newname);
     // FILL OUT
 
-int myfuse_truncate(const char *, off_t);
+int myfuse_truncate(const char *filename, off_t offset);
     // FILL OUT
 
-int myfuse_open(const char *, struct fuse_file_info *);
+int myfuse_open(const char *filename, struct fuse_file_info * asdf);
     // FILL OUT
 
 
@@ -104,7 +104,7 @@ int myfuse_read(const char * filename, char *output, size_t length, off_t offset
 int myfuse_write(const char * filename, const char * input, size_t length, off_t offset, struct fuse_file_info * asdf);
     // FILL OUT
 
-int myfuse_release(const char *, struct fuse_file_info *);
+int myfuse_release(const char *filename, struct fuse_file_info *asdf);
     // FILL OUT
 
 void * myfuse_init(struct fuse_conn_info * asdf);
@@ -113,7 +113,7 @@ void * myfuse_init(struct fuse_conn_info * asdf);
 void myfuse_destroy(void * helper);
     // FILL OUT
 
-int myfuse_create(const char * filename, mode_t, struct fuse_file_info *);
+int myfuse_create(const char * filename, mode_t ignore, struct fuse_file_info *asdf);
     // FILL OUT
 
 struct fuse_operations operations = {
@@ -149,22 +149,22 @@ int main(int argc, char * argv[]) {
 
 
 
-int myfuse_unlink(const char *){
+int myfuse_unlink(const char * filename){
    return 0;
 }// delete
     // FILL OUT
 // don't pass in name, pass in name+1
-int myfuse_rename(const char *, const char *){
+int myfuse_rename(const char * filename, const char * newname){
    return 0;
 }
     // FILL OUT
 
-int myfuse_truncate(const char *, off_t){
+int myfuse_truncate(const char *filename, off_t offset){
    return 0;
 }
     // FILL OUT
 
-int myfuse_open(const char *, struct fuse_file_info *){
+int myfuse_open(const char *filename, struct fuse_file_info * asdf){
    return 0;
 }
     // FILL OUT
@@ -184,7 +184,7 @@ int myfuse_write(const char * filename, const char * input, size_t length, off_t
 }
     // FILL OUT
 
-int myfuse_release(const char *, struct fuse_file_info *){
+int myfuse_release(const char * filename, struct fuse_file_info * asdf){
    return 0;
 }
     // FILL OUT
@@ -195,6 +195,6 @@ void * myfuse_init(struct fuse_conn_info * asdf){}
 void myfuse_destroy(void * helper){}
     // FILL OUT
 
-int myfuse_create(const char * filename, mode_t, struct fuse_file_info *){
+int myfuse_create(const char * filename, mode_t ignore, struct fuse_file_info * adsf ){
    return 0;
 }
