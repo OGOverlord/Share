@@ -146,3 +146,55 @@ int main(int argc, char * argv[]) {
     int ret = fuse_main(argc, argv, &operations, NULL);
     return ret;
 }
+
+
+
+int myfuse_unlink(const char *){
+   return 0;
+}// delete
+    // FILL OUT
+// don't pass in name, pass in name+1
+int myfuse_rename(const char *, const char *){
+   return 0;
+}
+    // FILL OUT
+
+int myfuse_truncate(const char *, off_t){
+   return 0;
+}
+    // FILL OUT
+
+int myfuse_open(const char *, struct fuse_file_info *){
+   return 0;
+}
+    // FILL OUT
+
+
+    //reutnr number of succesffully read bytes
+//if filesize is 20, but offset is 5, and you want to read in 50 bytes, return 15.
+int myfuse_read(const char * filename, char *output, size_t length, off_t offset, struct fuse_file_info * asdf )    // FILL OUT
+{
+   Help* helper =  (Help*)(fuse_get_context()->private_data);
+   return 0;
+}
+//reutnr number of succesffully written bytes
+// if offset is greater than the length of the file, resize first.
+int myfuse_write(const char * filename, const char * input, size_t length, off_t offset, struct fuse_file_info * asdf){
+   return 0;
+}
+    // FILL OUT
+
+int myfuse_release(const char *, struct fuse_file_info *){
+   return 0;
+}
+    // FILL OUT
+
+void * myfuse_init(struct fuse_conn_info * asdf){}
+    // FILL OUT
+
+void myfuse_destroy(void * helper){}
+    // FILL OUT
+
+int myfuse_create(const char * filename, mode_t, struct fuse_file_info *){
+   return 0;
+}
