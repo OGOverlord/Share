@@ -12,7 +12,7 @@
 #include <errno.h>
 
 #include "myfilesystem.h"
-// #include "myfilesystem.c"
+#include "myfilesystem.c"
 
 char * file_data_file_name = NULL;
 char * directory_table_file_name = NULL;

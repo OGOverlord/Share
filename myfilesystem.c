@@ -20,23 +20,23 @@ void compute_hash_treeNoLock(void * helper);
 
 void compute_hash_blockNoLock(size_t block_offset, void * helper);
 
-typedef struct HelpStruct{
-   // these files are fixed in size. they will not run out of space
-   FILE *file_data;
-   FILE *directory_table;
-   FILE *hash_data;
-   int dir_size;
-   int file_size;
-   int threads_max;
-   pthread_mutex_t lock;
-}Help;
-
-typedef struct LinkedList{
-    int data;
-    int offset;
-    int length;
-    struct LinkedList *next;
-}Node;
+// typedef struct HelpStruct{
+//    // these files are fixed in size. they will not run out of space
+//    FILE *file_data;
+//    FILE *directory_table;
+//    FILE *hash_data;
+//    int dir_size;
+//    int file_size;
+//    int threads_max;
+//    pthread_mutex_t lock;
+// }Help;
+//
+// typedef struct LinkedList{
+//     int data;
+//     int offset;
+//     int length;
+//     struct LinkedList *next;
+// }Node;
 
 
 
