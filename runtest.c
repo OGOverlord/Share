@@ -36,11 +36,27 @@ int already(){
       return 0;
    }
 */
-   ret = create_file("config", 3, helper);
+   return ret;
+}
+
+int reading(){
+   void * helper = init_fs("before/10_file_data", "before/10_directory_table", "before/10_hash_data", 4);
+   char buf[11];
+   int ret = read_file("file1.txt", 5, 50, buf, helper);
+   ret = read_file("file1.txt", 5, 10, buf, helper);
    close_fs(helper);
    return ret;
 }
 
+
+int writing(){
+   void * helper = init_fs("before/12_file_data", "before/12_directory_table", "before/12_hash_data", 4);
+   char buf[] = "tests";
+   int ret = write_file("file1.txt", 160, 50, buf, helper);
+   ret = write_file("file1.txt", 16, 5, buf, helper);
+   close_fs(helper);
+   return ret;
+}
 /****************************/
 
 /* Helper function */
@@ -66,7 +82,8 @@ int main(int argc, char * argv[]) {
     TEST(success);
     TEST(failure);
     TEST(no_operation);
-    TEST(already);
+    // TEST(already);
+    TEST(writing);
 
     // Add more tests here
 

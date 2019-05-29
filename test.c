@@ -1,4 +1,6 @@
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
    // char * test = "123";
    // char a = 'b';
@@ -31,18 +33,31 @@
    };
 
    int main(){
-      int count;
-      FILE *ptr;
-      struct record myRecord;
-      ptr=fopen("test.bin","rb");
-      if (!ptr){
-         printf("Unable to open file!");
-         return 1;
+      // for(int k = 1; k<1; k++){
+      //    printf("Shouldn't work\n");
+      // }
+      uint8_t * buf = 2^60;
+
+
+      printf("finished checkign out the values here\n");
+      uint64_t a = 0; //It needs to be 64 bytes so that a+data[i] doesn't go all the way around. before the mod is applied
+      uint64_t b = 0;
+      uint64_t c = 0;
+      uint64_t d = 0;
+      for(int i = 0; i<length; i++){
+         a = (a + buf[i]) %((2^32)-1);
+         b = (b + a) % ((2^32)-1);
+         c = (c + b) %((2^32)-1);
+         d = (d + c) % ((2^32)-1);
       }
-      for ( count=1; count <= 10; count++){
-         fread(&myRecord,sizeof(struct record),1,ptr);
-         printf("%d\n",myRecord.a);
-      }
-      fclose(ptr);
-      return 0;
+      //uint8_t hash_value[16] = concatenate a, b, c, d //4x4 = 16 bytes in total
+      uint8_t hash_value[16];
+      hash_value[0]=(uint32_t)a;
+      hash_value[4]=(uint32_t)b;
+      hash_value[8]=(uint32_t)c;
+      hash_value[12]=(uint32_t)d;
+      //Note: when you concatenate a, b, c, d you must treat them as uint32_t
+      //That is, treat them as 4 byte little endian integers, even though
+      //we suggest you use uint64_t for the calculations
+      memcpy(buf,hash_value,16);
    }

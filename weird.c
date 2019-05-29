@@ -7,18 +7,8 @@
 
 
 #include <pthread.h>
-#include <time.h>
 #define true 1
 #define false 0
-
-
-int resize_fileNoLock(char * filename, size_t length, void * helper);
-
-void repackNoLock(void * helper);
-
-void compute_hash_treeNoLock(void * helper);
-
-void compute_hash_blockNoLock(size_t block_offset, void * helper);
 
 typedef struct HelpStruct{
    // these files are fixed in size. they will not run out of space
@@ -28,7 +18,7 @@ typedef struct HelpStruct{
    int dir_size;
    int file_size;
    int threads_max;
-   pthread_mutex_t lock;
+   int threads;
 }Help;
 
 typedef struct LinkedList{
@@ -40,9 +30,7 @@ typedef struct LinkedList{
 
 
 
-// pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; //DON'T USE THIS. THIS IS NOT RECURSIVE
-
-
+//pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; DON'T USE THIS. THIS IS NOT RECURSIVE
 
 // this is the first function run. initialise all data structures needed.
 // Return a pointer to a memory area (void *) that you can use to store data for
@@ -78,7 +66,7 @@ void * init_fs(char * f1, char * f2, char * f3, int n_processors) {
    helper->file_size = len;
    fseek(helper->directory_table,0,SEEK_SET);
    helper->threads_max = n_processors;
-   pthread_mutex_init(&(helper->lock),NULL);
+   helper->threads = 0;
 
 
 
@@ -115,8 +103,6 @@ The stuff I am reading in is really dodgy.
 
 
 int create_file(char * filename, size_t length, void * helper) {
-   // printf("createfile\n");
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE* dir = ((Help*)helper)->directory_table;
    unsigned char buf[((Help*)helper)->dir_size];
    unsigned char buf2[((Help*)helper)->file_size];
@@ -137,7 +123,6 @@ int create_file(char * filename, size_t length, void * helper) {
          fseek(((Help*)helper)->directory_table,0,SEEK_SET);
          unsigned char test[0];
          fread(&test,sizeof(char),1,((Help*)helper)->directory_table);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return 1;
       }
    }
@@ -164,10 +149,15 @@ int create_file(char * filename, size_t length, void * helper) {
 
    if(success == -1){ // if it failed, then there isn't enough space in the directory. Therefore,
       // printf("why?\n");
-      pthread_mutex_unlock(&(((Help*)helper)->lock));
       return 2;
 
    }
+   // printf("looking ofr space\n");
+   // printf("%x \n",buf[64]);
+   // printf("%x \n",buf[65]);
+   // printf("%x \n",buf[66]);
+   // printf("%x \n",buf[67]);
+   // printf("%u \n",(int)buf[64]+((int)buf[65]<<8)+((int)buf[66]<<16)+((int)buf[67]<<24));
    int exists[((Help*)helper)->file_size];
    for(int i = 0; i<((Help*)helper)->file_size; i++){
       exists[i]=false;
@@ -221,7 +211,7 @@ int create_file(char * filename, size_t length, void * helper) {
    if(counter!=length){
       // repack
       //hold on, what will reapck actually do here?
-      repackNoLock(helper);
+      repack(helper);
       // printf("repack happened\n");
 
       // recalculate exists
@@ -274,11 +264,8 @@ int create_file(char * filename, size_t length, void * helper) {
 
    if(counter == length){
       if(position == -1){
-         compute_hash_treeNoLock(helper);
-         fflush(((Help*)helper)->file_data);
-         fflush(dir);
-         fflush(((Help*)helper)->hash_data);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
+         // printf("here?\n");
+         compute_hash_tree(helper);
          return 2;
       }
       // place this inside of the directory_table
@@ -300,22 +287,14 @@ int create_file(char * filename, size_t length, void * helper) {
       fseek(((Help*)helper)->file_data,0,SEEK_SET);
    }else{
       // printf("counter is %d, and legnth is %d\n",counter, (int)length);
-      compute_hash_treeNoLock(helper);
-      fflush(((Help*)helper)->file_data);
-      fflush(dir);
-      fflush(((Help*)helper)->hash_data);
-      pthread_mutex_unlock(&(((Help*)helper)->lock));
+      compute_hash_tree(helper);
       return 2;
       // return 0;
    }
-   // fseek(((Help*)helper)->directory_table,0,SEEK_SET);
-   // unsigned char test[0];
-   // fread(&test,sizeof(char),1,((Help*)helper)->directory_table);
-   compute_hash_treeNoLock(helper);
-   fflush(((Help*)helper)->file_data);
-   fflush(dir);
-   fflush(((Help*)helper)->hash_data);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
+   fseek(((Help*)helper)->directory_table,0,SEEK_SET);
+   unsigned char test[0];
+   fread(&test,sizeof(char),1,((Help*)helper)->directory_table);
+   compute_hash_tree(helper);
    return 0;
 }
 
@@ -348,17 +327,12 @@ int bothCharSame(char a[],char b[]){
 
 
 int resize_file(char * filename, size_t length, void * helper){
-   // printf("resizefile\n");
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    if(length>((Help*)helper)->file_size){
-      // printf("asdf\n");
-      pthread_mutex_unlock(&(((Help*)helper)->lock));
       return 2;
    }
    FILE * dir = ((Help*)helper)->directory_table;
    FILE * files = ((Help*)helper)->file_data;
    int size = ((Help*)helper)->dir_size/72;
-   unsigned int lll = (unsigned int)length;
    char truncated[64];
    truncate(filename,truncated);
    int position = -1;
@@ -373,19 +347,17 @@ int resize_file(char * filename, size_t length, void * helper){
       if(bothCharSame(name, truncated)==true){
          position = i;
          fseek(dir,72*i+64,SEEK_SET);
-         fread(buf,4,1,dir);
+         fread(&buf,4,1,dir);
          valueOffset = buf[0];
          fseek(dir,72*i+68,SEEK_SET);
-         fread(buf,4,1,dir);
+         fread(&buf,4,1,dir);
          valueLength = buf[0];
       }
    }
    unsigned char values[valueLength];
    fseek(files,valueOffset,SEEK_SET);
-   // fread(&values,valueLength,1,files);
-   fread(values,valueLength,1,files);
+   fread(&values,valueLength,1,files);
    if(position == -1){
-      pthread_mutex_unlock(&(((Help*)helper)->lock));
       return 1;
    }
    // now, position will be the number of 72-byte blocks in this went.
@@ -415,30 +387,26 @@ int resize_file(char * filename, size_t length, void * helper){
          unsigned char n = '\0';
          fwrite(&n,1,1,dir);
          //REPACK
-         repackNoLock(helper); //position variable is unchanged
+         repack(helper); //position variable is unchanged
          //find the position in file_data
          int currentMax = 0;
          for(int j =0; j<size;j++){
-            int buf1;
-            int buf2;
-            char bufv[1];
+            int buf1[1];
+            int buf2[1];
+            int bufv[1];
             fseek(dir,72*j,SEEK_SET);
-            fread(bufv,1,1,dir);
+            fread(&bufv,1,1,dir);
             fseek(dir,72*j+64,SEEK_SET);
             fread(&buf1,4,1,dir);
             fseek(dir,72*j+68,SEEK_SET);
             fread(&buf2,4,1,dir);
-            if(buf1+buf2 > currentMax && bufv[0]!='\0'){
-               currentMax = buf1+buf2;
+            if(buf1[0]+buf2[0] > currentMax && bufv[0]!='\0'){
+               currentMax = buf1[0]+buf2[0];
             }
          }
          //currentMax will thus be the position that one can add in. // check to make sure it is within bound
          if(currentMax+length>((Help*)helper)->file_size){
-            compute_hash_treeNoLock(helper);
-            // printf("adsasdfasdf\n");
-            fflush(dir);
-            fflush(files);
-            pthread_mutex_unlock(&(((Help*)helper)->lock));
+            compute_hash_tree(helper);
             return 2;
          }
          // go to the position, place all the values in.
@@ -447,7 +415,7 @@ int resize_file(char * filename, size_t length, void * helper){
          fseek(dir,72*position+64,SEEK_SET);
          fwrite(&currentMax,4,1,dir);
          fseek(dir,72*position+68,SEEK_SET);
-         fwrite(&lll,4,1,dir);
+         fwrite(&length,4,1,dir);
          // place the values into file_data
          fseek(files,currentMax,SEEK_SET);
          unsigned char buf[length];
@@ -461,13 +429,12 @@ int resize_file(char * filename, size_t length, void * helper){
          fwrite(&buf,length,1,files);
       }else{ //if repack was not called
          // go to the position, place all the values in.
-         // printf("position is %d\n",position);
          fseek(dir,72*position,SEEK_SET);
          fwrite(&truncated,64,1,dir);
          fseek(dir,72*position+64,SEEK_SET);
          fwrite(&valueOffset,4,1,dir);
          fseek(dir,72*position+68,SEEK_SET);
-         fwrite(&lll,4,1,dir);
+         fwrite(&length,4,1,dir);
          // place the values into file_data
          unsigned char buf[length];
          for(int i=0;i<length;i++){
@@ -479,19 +446,14 @@ int resize_file(char * filename, size_t length, void * helper){
          }
          fwrite(&buf,length,1,files);
       }
-      // printf("repackbool was %d\n",repackbool);
    }else if(length < valueLength){
-      // printf("length was less than the valuelength\n");
-      // printf("valuelength was %d\n",valueLength);
       // go to the position, place all the values in.
       fseek(dir,72*position,SEEK_SET);
       fwrite(&truncated,64,1,dir);
       fseek(dir,72*position+64,SEEK_SET);
       fwrite(&valueOffset,4,1,dir);
-      // printf("length is %ld\n",length);
       fseek(dir,72*position+68,SEEK_SET);
-      fwrite(&lll,4,1,dir);
-      fflush(dir);
+      fwrite(&length,4,1,dir);
       // place the values into file_data
       unsigned char buf[length];
       for(int i=0;i<length;i++){
@@ -499,23 +461,16 @@ int resize_file(char * filename, size_t length, void * helper){
       }
       fseek(files,valueOffset,SEEK_SET);
       fwrite(&buf,length,1,files);
-      fflush(files);
 
    }
    fseek(files,54,SEEK_SET);
    unsigned char test[1];
    fread(&test,1,1,files);
-   compute_hash_treeNoLock(helper);
-   // printf("end of the line.\n");
-   fflush(dir);
-   fflush(files);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
+   compute_hash_tree(helper);
    return 0;
 }
 
 void repack(void * helper) {
-   // printf("repack\n");
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE* dir = ((Help*)helper)->directory_table;
    FILE* files = ((Help*)helper)->file_data;
    // unsigned char test[1];
@@ -579,7 +534,6 @@ void repack(void * helper) {
          fseek(dir,(curr->data)+64,SEEK_SET); // this somehow edits 68
          fwrite(&minpos,4,1,dir); // places the minimum value into the directory_table's offset
          minpos = minpos+(curr->length);
-         fflush(files);
       }else if(minpos == curr->offset){
          minpos = minpos+(curr->length);
       }
@@ -594,14 +548,10 @@ void repack(void * helper) {
       after = after->next;
    }
    free(curr);
-   compute_hash_treeNoLock(helper);
-   fflush(dir);
-   fflush(files);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
+   compute_hash_tree(helper);
 }
 
 int delete_file(char * filename, void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE * dir = ((Help*)helper)->directory_table;
    // FILE * files = ((Help*)helper)->file_data;
    int size = ((Help*)helper)->dir_size/72;
@@ -615,17 +565,13 @@ int delete_file(char * filename, void * helper) {
       if(bothCharSame(name, truncated)==true){
          fseek(dir,72*i,SEEK_SET);
          fwrite(&buf,1,1,dir);
-         fflush(dir);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return 0;
       }
    }
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
    return 1;
 }
 
 int rename_file(char * oldname, char * newname, void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE * dir = ((Help*)helper)->directory_table;
    // FILE * files = ((Help*)helper)->file_data;
    int size = ((Help*)helper)->dir_size/72;
@@ -636,7 +582,6 @@ int rename_file(char * oldname, char * newname, void * helper) {
       fseek(dir,72*i,SEEK_SET);
       fread(&name,64,1,dir);
       if(bothCharSame(name, truncated)==true){
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return 1;
       }
    }
@@ -649,19 +594,13 @@ int rename_file(char * oldname, char * newname, void * helper) {
          truncate(newname,truncated);
          fseek(dir,72*i,SEEK_SET);
          fwrite(truncated,64,1,dir);
-         fflush(dir);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return 0;
       }
    }
-   fflush(dir);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
    return 1;
 }
 
 int read_file(char * filename, size_t offset, size_t count, void * buf, void * helper) {
-   // printf("read ifle\n");
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE * dir = ((Help*)helper)->directory_table;
    FILE * files = ((Help*)helper)->file_data;
    FILE * hash = ((Help*)helper)->hash_data;
@@ -684,7 +623,6 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
          fread(&fileLength,4,1,dir);
          // printf("count %ld, offset %ld, fileLength %d\n",count, offset, fileLength[0]);
          if(count+offset>=fileLength||(fileOffset+offset+count)>((Help*)helper)->file_size){
-            pthread_mutex_unlock(&(((Help*)helper)->lock));
             return 2;
          }
          fseek(files,fileOffset+offset,SEEK_SET);
@@ -697,6 +635,12 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
             min = min-1;
          }
          int blocks = ceil((fileOffset+offset+count)/256.0);
+         // if((fileOffset+offset+count)%256==0){
+         //    blocks = (fileOffset+offset+count)/256;
+         // }else{
+         //    blocks = (fileOffset+offset+count)/256 + 1;
+         // }
+         // printf("the file's blocks are %d\n",blocknumber);
          for(int b=min; b<blocks;b+=2){
             int pos = blocksize-blocknumber+b;
 
@@ -710,12 +654,22 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
                fseek(hash,pos*16,SEEK_SET);
                uint8_t hashV[16];
                fread(hashV,1,16,hash);
+               // for(int j=0;j<16;j++){
+               //    printf("%d",hashV[j]);
+               // }
+               // printf("\n");
+               // for(int j=0;j<16;j++){
+               //    printf("%d",str[j]);
+               // }
+               // printf("\n");
                if(memcmp(hashV,str,16)!=0){
-                  pthread_mutex_unlock(&(((Help*)helper)->lock));
                   return 3;
                }else{
                   // printf("OK!\n");
                }
+               // fseek(hash, pos*16,SEEK_SET);
+               // fwrite(str,1,16,hash);
+
                fseek(hash, pos*16,SEEK_SET);
                uint8_t buf[32];
                fread(buf,1,32,hash);
@@ -723,20 +677,21 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
                pos = (pos-1)/2;
             }
          }
+
+
+
          //end of check
+
+
          // buf = (void*) test; doesn't work
          memcpy(buf, test, count);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return 0;
       }
    }
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
    return 1;
 }
 
 int write_file(char * filename, size_t offset, size_t count, void * buf, void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
-   // printf("write file\n");
    char test[count];
    memcpy(test, buf, count);
    FILE * dir = ((Help*)helper)->directory_table;
@@ -762,47 +717,32 @@ int write_file(char * filename, size_t offset, size_t count, void * buf, void * 
          fseek(dir,72*i+68,SEEK_SET);
          fread(&fileLength,4,1,dir);
          if(count+offset>=fileLength){ // repack
-            if(offset>fileLength){ // I assume that returning 2 prevents it from actually affecting any other data
-               // printf("offset >filelength\n");
-               pthread_mutex_unlock(&(((Help*)helper)->lock));
+            if(offset>=fileLength){ // I assume that returning 2 prevents it from actually affecting any other data
                return 2;
-            // }else if(offset==fileLength){
-            //    printf("offset and filength are equal\n");
             }else{
                repackyes=true;
             }
          }
          if(repackyes==false){
             fseek(files,fileOffset+offset,SEEK_SET);
-            // fwrite(&test,count,1,files);
-            fwrite(test,count,1,files);
-            fflush(files);
+            fwrite(&test,count,1,files);
             fseek(dir,208,SEEK_SET);
             fread(&test,1,1,dir);
-            compute_hash_treeNoLock(helper);
-            fflush(files);
-            fflush(dir);
-            fflush(((Help*)helper)->hash_data);
-            pthread_mutex_unlock(&(((Help*)helper)->lock));
-            // printf("no need to reapc\n");
+            compute_hash_tree(helper);
             return 0;
          }
       }
    }
    if(exists==false){
-      pthread_mutex_unlock(&(((Help*)helper)->lock));
       return 1;
    }
    if(repackyes==true){
-      fseek(files,0,SEEK_SET);
-      int check = resize_fileNoLock(filename,count+offset,helper);
+      int check = resize_file(filename,count+offset,helper);
+      // resize_file(truncated,count+offset,helper);
+      // printf("resize happened\n");
+      // printf("%d\n",check);
       if(check!=0){
-         // printf("check is %d\n",check);
-         compute_hash_treeNoLock(helper);
-         fflush(files);
-         fflush(dir);
-         fflush(((Help*)helper)->hash_data);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
+         compute_hash_tree(helper);
          return 3;
       }
       for(int i = 0; i< size; i++){
@@ -824,30 +764,20 @@ int write_file(char * filename, size_t offset, size_t count, void * buf, void * 
             memcpy(test, buf, count);
             fseek(files,fileOffset+offset,SEEK_SET);
             fwrite(&test,count,1,files);
-            fflush(files);
-            // fseek(dir,208,SEEK_SET);
-            // fread(&test,1,1,dir);
+            fseek(dir,208,SEEK_SET);
+            fread(&test,1,1,dir);
             // printf("at byte 208, the byte is %d\n",test[0]);
-            compute_hash_treeNoLock(helper);
-            fflush(files);
-            fflush(dir);
-            fflush(((Help*)helper)->hash_data);
-            pthread_mutex_unlock(&(((Help*)helper)->lock));
+            compute_hash_tree(helper);
             return 0;
          }
       }
    }
 
-   compute_hash_treeNoLock(helper);
-   fflush(files);
-   fflush(dir);
-   fflush(((Help*)helper)->hash_data);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
+   compute_hash_tree(helper);
    return 1;
 }
 
 ssize_t file_size(char * filename, void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
    FILE * dir = ((Help*)helper)->directory_table;
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
@@ -860,11 +790,9 @@ ssize_t file_size(char * filename, void * helper) {
          int fileLength;
          fseek(dir,72*i+68,SEEK_SET);
          fread(&fileLength,4,1,dir);
-         pthread_mutex_unlock(&(((Help*)helper)->lock));
          return fileLength;
       }
    }
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
    return -1;
 }
 
@@ -909,6 +837,7 @@ void fletcher(uint8_t * buf, size_t length, uint8_t * output) {
       *(output+i) = *(hash_value+i);
    }
    free(hash_value);
+
 }
 
 /*go through 25 bytes. Count the number of. The number of levels is log(that number ) with base 2.
@@ -916,8 +845,6 @@ void fletcher(uint8_t * buf, size_t length, uint8_t * output) {
 
 */
 void compute_hash_tree(void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
-   // printf("compute hash\n");
    FILE * files = ((Help*)helper)->file_data;
    FILE * hash = ((Help*)helper)->hash_data;
    int filesize = ((Help*)helper)->file_size;
@@ -959,425 +886,41 @@ void compute_hash_tree(void * helper) {
    // printf("%d\n",tmp[0]);
    fseek(hash,0,SEEK_SET);
    fwrite(arr,1,16*size,hash);
-   fflush(hash);
+
    // fseek(hash,0,SEEK_SET);
    // fread(tmp,1,1,hash);
    // printf("%d\n",tmp[0]);
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
 }
 
 void compute_hash_block(size_t block_offset, void * helper) {
-   pthread_mutex_lock(&(((Help*)helper)->lock));
-   // printf("hash block\n");
-   // compute_hash_treeNoLock(helper);
    FILE * files = ((Help*)helper)->file_data;
    FILE * hash = ((Help*)helper)->hash_data;
    int filesize = ((Help*)helper)->file_size;
    int blocknumber = filesize/256;
    int size = 2*blocknumber-1;
-   int pos = size-blocknumber+block_offset;
 
-   fseek(hash,0,SEEK_SET);
-   uint8_t asdf[1];
-   fread(asdf,1,1,hash);
-   // printf("%d\n",asdf[0]);
+   int pos = size-blocknumber+block_offset;
+   if(block_offset%2==1){
+      pos = pos-1;
+   }
    uint8_t tmp[256];
    uint8_t str[16];
    fseek(files,block_offset*256,SEEK_SET);
    fread(tmp,1,256,files);
    fletcher(tmp,256,str);
-   fseek(hash, pos*16,SEEK_SET);
-   fwrite(str,1,16,hash);
-   fflush(hash);
-   if(block_offset%2==1){
-      pos = pos-1;
-   }
-
    // uint8_t new[256];
    while(pos>=0){
-      //write the value in before computing for the next
-
+      fseek(hash, pos*16,SEEK_SET);
       uint8_t buf[32];
-      if(pos%2==0){ // even (i.e. is the end of the conacntenation)
-         fseek(hash, (pos-1)*16,SEEK_SET);
-         for(int i =0; i<32;i++){
-            fread(&buf[i],1,1,hash);
-         }
-         fletcher(buf,32,str);
-      }else{
-         fseek(hash, pos*16,SEEK_SET);
-         for(int i =0; i<32;i++){
-            fread(&buf[i],1,1,hash);
-         }
-         fletcher(buf,32,str);
-      }
-
+      fread(buf,1,32,hash);
+      fseek(hash, pos*16,SEEK_SET);
+      fwrite(str,1,16,hash);
+      fletcher(buf,32,str);
       if(pos==0){
          break;
       }else{
-         pos=(pos-1)/2;
-         fseek(hash, pos*16,SEEK_SET);
-         fwrite(str,1,16,hash);
-         fflush(hash);
-      }
-   }
-   pthread_mutex_unlock(&(((Help*)helper)->lock));
-}
-
-
-
-
-void repackNoLock(void * helper) {
-   // printf("repack\n");
-   FILE* dir = ((Help*)helper)->directory_table;
-   FILE* files = ((Help*)helper)->file_data;
-   // unsigned char test[1];
-   // fseek(dir,64,SEEK_SET);
-   // fread(&test,1,1,dir);
-   // fseek(dir,68,SEEK_SET);
-   // fread(&test,1,1,dir);
-   // fseek(dir,0,SEEK_SET);
-   // fseek(files,0,SEEK_SET);
-   int size = (((Help*)helper)->dir_size)/72;
-   // REMEMBER TO FREE NODES
-   Node *head = (Node*)malloc(sizeof(Node));
-   Node *curr = head;
-   head->data = -1;
-   head->offset = -1;
-   head->length = -1;
-   head->next = NULL;
-   for(int i = 0; i< size; i++){
-      unsigned char doesFileExist[1];
-      fseek(dir, 72*i,SEEK_SET);
-      fread(&doesFileExist,1,1,dir);
-      if(doesFileExist[0]!='\0'){
-         Node * new = (Node*)malloc(sizeof(Node));
-         // fseek(dir,72*i,SEEK_SET);
-         // fread(&(new->data),4,1,dir);
-         // the above two lines make no sense
-         new->data = 72*i;
-         fseek(dir,72*i+64,SEEK_SET);
-         fread(&(new->offset),4,1,dir);
-         fseek(dir,72*i+68,SEEK_SET);
-         fread(&(new->length),4,1,dir);
-         curr = head;
-         int j = 0; // j will be the position of curr, with 0 as the head.
-         while(curr!=NULL&&(new->offset > curr-> offset)){
-            curr = curr->next;
-            j++;
-         }
-         // right now, j will be the value that new will replace, shifting the original j to new->next
-         //0 : head, 1: head->next ,...... j-1: something, j: new, j+1 : original j
-         Node*curr = head;
-         for(int k = 1; k<j; k++){ // won't run if j is 1. Thus, curr is still head in that case.
-            curr = curr->next;
-         }
-         new->next = curr->next;
-         curr->next = new;
-      }
-
-   }
-   // Now, I have an ordered list of nodes.
-   curr = head->next; // cos head isn't actuall one of the files
-   int minpos = 0;
-   //int end = 0;
-   while(curr!=NULL){
-      if(minpos > curr->offset && curr!=head){
-      }else if(minpos < curr->offset){ // i.e. no need to do anything when the minimum and the offset are the same
-         unsigned char values[curr->length];
-         fseek(files,(curr->offset),SEEK_SET);
-         fread(&values,curr->length,1,files);
-         fseek(files,minpos,SEEK_SET);
-         fwrite(&values,curr->length,1,files);
-         fseek(dir,(curr->data)+64,SEEK_SET); // this somehow edits 68
-         fwrite(&minpos,4,1,dir); // places the minimum value into the directory_table's offset
-         minpos = minpos+(curr->length);
-         fflush(files);
-      }else if(minpos == curr->offset){
-         minpos = minpos+(curr->length);
-      }
-      curr = curr->next;
-   }
-   // free Nodes
-   curr = head;
-   Node* after = head->next;
-   while(after!=NULL){
-      free(curr);
-      curr = after;
-      after = after->next;
-   }
-   free(curr);
-   compute_hash_treeNoLock(helper);
-   fflush(dir);
-   fflush(files);
-}
-
-
-
-int resize_fileNoLock(char * filename, size_t length, void * helper){
-   // printf("resizefile\n");
-   if(length>((Help*)helper)->file_size){
-      // printf("asdf\n");
-      return 2;
-   }
-   FILE * dir = ((Help*)helper)->directory_table;
-   FILE * files = ((Help*)helper)->file_data;
-   int size = ((Help*)helper)->dir_size/72;
-   unsigned int lll = (unsigned int)length;
-   char truncated[64];
-   truncate(filename,truncated);
-   int position = -1;
-   int valueLength = -1;
-   int valueOffset = -1;
-   // unsigned char values[length];
-   for(int i = 0; i< size; i++){
-      int buf[1];
-      char name[64];
-      fseek(dir,72*i,SEEK_SET);
-      fread(&name,64,1,dir);
-      if(bothCharSame(name, truncated)==true){
-         position = i;
-         fseek(dir,72*i+64,SEEK_SET);
-         fread(buf,4,1,dir);
-         valueOffset = buf[0];
-         fseek(dir,72*i+68,SEEK_SET);
-         fread(buf,4,1,dir);
-         valueLength = buf[0];
-      }
-   }
-   unsigned char values[valueLength];
-   fseek(files,valueOffset,SEEK_SET);
-   // fread(&values,valueLength,1,files);
-   fread(values,valueLength,1,files);
-   if(position == -1){
-      return 1;
-   }
-   // now, position will be the number of 72-byte blocks in this went.
-   // values, valueOffset, and valueLength will have the correct value.
-   int tes[4];
-   fseek(dir,72*position+64,SEEK_SET);
-   fread(&tes,4,1,dir);
-   fseek(dir,72*position+68,SEEK_SET);
-   fread(&tes,4,1,dir);
-   if(length > valueLength){ // increasing the length
-      int repackbool = false;
-      for(int i = 0; i<size; i++){ // check for VALUE
-         int o;
-         int l;
-         fseek(dir,72*i+64,SEEK_SET);
-         fread(&o,4,1,dir);
-         fseek(dir,72*i+68,SEEK_SET);
-         fread(&l,4,1,dir);
-         if(o>=valueOffset&&o<valueOffset+length){ // between the offset and the new length
-            repackbool=true;
-         }
-      }
-
-      if(repackbool==true){
-         //delete the current file
-         fseek(dir,position*72,SEEK_SET);
-         unsigned char n = '\0';
-         fwrite(&n,1,1,dir);
-         //REPACK
-         repackNoLock(helper); //position variable is unchanged
-         //find the position in file_data
-         int currentMax = 0;
-         for(int j =0; j<size;j++){
-            int buf1;
-            int buf2;
-            char bufv[1];
-            fseek(dir,72*j,SEEK_SET);
-            fread(bufv,1,1,dir);
-            fseek(dir,72*j+64,SEEK_SET);
-            fread(&buf1,4,1,dir);
-            fseek(dir,72*j+68,SEEK_SET);
-            fread(&buf2,4,1,dir);
-            if(buf1+buf2 > currentMax && bufv[0]!='\0'){
-               currentMax = buf1+buf2;
-            }
-         }
-         //currentMax will thus be the position that one can add in. // check to make sure it is within bound
-         if(currentMax+length>((Help*)helper)->file_size){
-            compute_hash_treeNoLock(helper);
-            // printf("adsasdfasdf\n");
-            fflush(dir);
-            fflush(files);
-            return 2;
-         }
-         // go to the position, place all the values in.
-         fseek(dir,72*position,SEEK_SET);
-         fwrite(&truncated,64,1,dir);
-         fseek(dir,72*position+64,SEEK_SET);
-         fwrite(&currentMax,4,1,dir);
-         fseek(dir,72*position+68,SEEK_SET);
-         fwrite(&lll,4,1,dir);
-         // place the values into file_data
-         fseek(files,currentMax,SEEK_SET);
-         unsigned char buf[length];
-         for(int i=0;i<length;i++){
-            if(i<valueLength){
-               buf[i]=values[i];
-            }else{
-               buf[i]='\0';
-            }
-         }
-         fwrite(&buf,length,1,files);
-      }else{ //if repack was not called
-         // go to the position, place all the values in.
-         // printf("position is %d\n",position);
-         fseek(dir,72*position,SEEK_SET);
-         fwrite(&truncated,64,1,dir);
-         fseek(dir,72*position+64,SEEK_SET);
-         fwrite(&valueOffset,4,1,dir);
-         fseek(dir,72*position+68,SEEK_SET);
-         fwrite(&lll,4,1,dir);
-         // place the values into file_data
-         unsigned char buf[length];
-         for(int i=0;i<length;i++){
-            if(i<valueLength){
-               buf[i]=values[i];
-            }else{
-               buf[i]='\0';
-            }
-         }
-         fwrite(&buf,length,1,files);
-      }
-      // printf("repackbool was %d\n",repackbool);
-   }else if(length < valueLength){
-      // printf("length was less than the valuelength\n");
-      // printf("valuelength was %d\n",valueLength);
-      // go to the position, place all the values in.
-      fseek(dir,72*position,SEEK_SET);
-      fwrite(&truncated,64,1,dir);
-      fseek(dir,72*position+64,SEEK_SET);
-      fwrite(&valueOffset,4,1,dir);
-      // printf("length is %ld\n",length);
-      fseek(dir,72*position+68,SEEK_SET);
-      fwrite(&lll,4,1,dir);
-      fflush(dir);
-      // place the values into file_data
-      unsigned char buf[length];
-      for(int i=0;i<length;i++){
-         buf[i]=values[i];
-      }
-      fseek(files,valueOffset,SEEK_SET);
-      fwrite(&buf,length,1,files);
-      fflush(files);
-
-   }
-   fseek(files,54,SEEK_SET);
-   unsigned char test[1];
-   fread(&test,1,1,files);
-   compute_hash_treeNoLock(helper);
-   // printf("end of the line.\n");
-   fflush(dir);
-   fflush(files);
-   return 0;
-}
-
-
-void compute_hash_treeNoLock(void * helper) {
-   // printf("compute hash\n");
-   FILE * files = ((Help*)helper)->file_data;
-   FILE * hash = ((Help*)helper)->hash_data;
-   int filesize = ((Help*)helper)->file_size;
-   int blocknumber = filesize/256;
-   int size = 2*blocknumber-1;
-   uint8_t arr[16*size];
-   for(int i = 0; i< blocknumber;i++){
-      uint8_t tmp[256];
-      uint8_t str[16];
-      fseek(files,256*i,SEEK_SET);
-      fread(tmp,1,256,files);
-      fletcher(tmp,256,str);
-      for(int j =0; j<16;j++){
-         // arr[16*size-16*blocknumber+16*i+j]=str[j];
-         arr[16*(size-blocknumber+i)+j] = str[j];
+         pos =(pos-1)/2;
       }
    }
 
-   // int parent = size-blocknumber;
-   for(int i = size-1; i>0; i-=2){
-      uint8_t tmp[32];
-      for(int j = 0 ; j< 16 ; j++){
-         tmp[j] = arr[16*(i-1)+j];
-         tmp[j+16] = arr[16*(i)+j];
-      }
-      uint8_t sixteen[16];
-      fletcher(tmp,32,sixteen);
-      for(int j = 0; j<16; j++){
-         arr[16*((i-2)/2)+j] = sixteen[j];
-      }
-   }
-
-
-
-
-   // uint8_t tmp[0];
-   // fseek(hash,0,SEEK_SET);
-   // fread(tmp,1,1,hash);
-   // printf("%d\n",tmp[0]);
-   fseek(hash,0,SEEK_SET);
-   fwrite(arr,1,16*size,hash);
-   fflush(hash);
-   // fseek(hash,0,SEEK_SET);
-   // fread(tmp,1,1,hash);
-   // printf("%d\n",tmp[0]);
-}
-
-
-void compute_hash_blockNoLock(size_t block_offset, void * helper) {
-   // printf("hash block\n");
-   // compute_hash_treeNoLock(helper);
-   FILE * files = ((Help*)helper)->file_data;
-   FILE * hash = ((Help*)helper)->hash_data;
-   int filesize = ((Help*)helper)->file_size;
-   int blocknumber = filesize/256;
-   int size = 2*blocknumber-1;
-   int pos = size-blocknumber+block_offset;
-
-   fseek(hash,0,SEEK_SET);
-   uint8_t asdf[1];
-   fread(asdf,1,1,hash);
-   // printf("%d\n",asdf[0]);
-   uint8_t tmp[256];
-   uint8_t str[16];
-   fseek(files,block_offset*256,SEEK_SET);
-   fread(tmp,1,256,files);
-   fletcher(tmp,256,str);
-   fseek(hash, pos*16,SEEK_SET);
-   fwrite(str,1,16,hash);
-   fflush(hash);
-   if(block_offset%2==1){
-      pos = pos-1;
-   }
-
-   // uint8_t new[256];
-   while(pos>=0){
-      //write the value in before computing for the next
-
-      uint8_t buf[32];
-      if(pos%2==0){ // even (i.e. is the end of the conacntenation)
-         fseek(hash, (pos-1)*16,SEEK_SET);
-         for(int i =0; i<32;i++){
-            fread(&buf[i],1,1,hash);
-         }
-         fletcher(buf,32,str);
-      }else{
-         fseek(hash, pos*16,SEEK_SET);
-         for(int i =0; i<32;i++){
-            fread(&buf[i],1,1,hash);
-         }
-         fletcher(buf,32,str);
-      }
-
-      if(pos==0){
-         break;
-      }else{
-         pos=(pos-1)/2;
-         fseek(hash, pos*16,SEEK_SET);
-         fwrite(str,1,16,hash);
-         fflush(hash);
-      }
-   }
 }
