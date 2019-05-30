@@ -28,7 +28,7 @@ if it doesn't exist, return -ENOENT, defined in errno.h
 
 */
 
-int file_exists(char* filename, void* helper){
+int file_exists(const char* filename, void* helper){
    FILE * dir = ((Help*)helper)->directory_table;
    FILE * files = ((Help*)helper)->file_data;
    int filesize = ((Help*)helper)->file_size;
