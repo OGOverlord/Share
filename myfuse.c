@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <fuse.h>
 #include <errno.h>
-
+#include <math.h>
 #include "myfilesystem.h"
 #include "myfilesystem.c"
 
@@ -37,7 +37,7 @@ int file_exists(const char* filename, void* helper){
    size = ftell(dir);
    char truncated[64];
    char* a = (char*) filename;
-   truncateIt(filename,truncated);
+   truncateIt(a,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
@@ -100,10 +100,10 @@ int myfuse_open(const char *filename, struct fuse_file_info * asdf);
 //if filesize is 20, but offset is 5, and you want to read in 50 bytes, return 15.
 int myfuse_read(const char * filename, char *output, size_t length, off_t offset, struct fuse_file_info * asdf );
     // FILL OUT
-{
-   Help* helper =  (Help*)(fuse_get_context()->private_data);
+//{
+  // Help* helper =  (Help*)(fuse_get_context()->private_data);
 
-}
+//}
 //reutnr number of succesffully written bytes
 // if offset is greater than the length of the file, resize first.
 int myfuse_write(const char * filename, const char * input, size_t length, off_t offset, struct fuse_file_info * asdf);
