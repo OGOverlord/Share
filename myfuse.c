@@ -58,14 +58,20 @@ int myfuse_getattr(const char * name, struct stat * result) {
     memset(result, 0, sizeof(struct stat));
     if (strcmp(name, "/") == 0) {
         result->st_mode = S_IFDIR;
+	result->st_size = 0;
+	result->st_nlink = 2;
 
     } else {
         result->st_mode = S_IFREG;
         char* buf[1];
         const char* a = name+1;
         if( file_exists(a,helper)==0 ){
+	   result->st_size = file_size(name,helper);
+	  // result->st_nlink = 1;
            return 0;
         }else{
+	   result->st_size = 0;
+	  // result->st_nlink = 0;
            return -ENOENT;
         }
     }
