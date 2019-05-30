@@ -36,7 +36,7 @@ int file_exists(char* filename, void* helper){
    fseek(dir, 0, SEEK_END);
    size = ftell(dir);
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
