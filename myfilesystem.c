@@ -696,7 +696,8 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
          if(min%2==1){
             min = min-1;
          }
-         int blocks = ceil((fileOffset+offset+count)/256.0);
+         int blocks = (fileOffset+offset+count)/256+((fileOffset+offset+count)%256!=0);
+         // int blocks has received the equivalent of the ceiling function
          for(int b=min; b<blocks;b+=2){
             int pos = blocksize-blocknumber+b;
 
