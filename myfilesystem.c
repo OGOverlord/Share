@@ -93,7 +93,7 @@ void close_fs(void * helper) {
 }
 
 
-void truncate(char* filename,char truncated[]){
+void truncateIt(char* filename,char truncated[]){
    for(int i = 0; i<63; i++){
       if(strlen(filename)>i){
          truncated[i]=filename[i];
@@ -125,7 +125,7 @@ int create_file(char * filename, size_t length, void * helper) {
    fread(buf,sizeof(char),((Help*)helper)->dir_size,((Help*)helper)->directory_table);
    fread(buf2,sizeof(char),((Help*)helper)->file_size,((Help*)helper)->file_data);
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    //create a char buf of that one.
    //check if the filename already exists
    char compared[((Help*)helper)->dir_size];
@@ -360,7 +360,7 @@ int resize_file(char * filename, size_t length, void * helper){
    int size = ((Help*)helper)->dir_size/72;
    unsigned int lll = (unsigned int)length;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    int position = -1;
    int valueLength = -1;
    int valueOffset = -1;
@@ -606,7 +606,7 @@ int delete_file(char * filename, void * helper) {
    // FILE * files = ((Help*)helper)->file_data;
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    for(int i = 0; i< size; i++){
       int buf[1]={'\0'};
       char name[64];
@@ -630,7 +630,7 @@ int rename_file(char * oldname, char * newname, void * helper) {
    // FILE * files = ((Help*)helper)->file_data;
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
-   truncate(newname,truncated);
+   truncateIt(newname,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
@@ -640,13 +640,13 @@ int rename_file(char * oldname, char * newname, void * helper) {
          return 1;
       }
    }
-   truncate(oldname,truncated);
+   truncateIt(oldname,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
       fread(&name,64,1,dir);
       if(bothCharSame(name, truncated)==true){
-         truncate(newname,truncated);
+         truncateIt(newname,truncated);
          fseek(dir,72*i,SEEK_SET);
          fwrite(truncated,64,1,dir);
          fflush(dir);
@@ -670,7 +670,7 @@ int read_file(char * filename, size_t offset, size_t count, void * buf, void * h
    int blocksize = 2*blocknumber-1;
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
@@ -746,7 +746,7 @@ int write_file(char * filename, size_t offset, size_t count, void * buf, void * 
    fread(&t,1,1,dir);
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    int repackyes = false;
    int exists = false;
    for(int i = 0; i< size; i++){
@@ -851,7 +851,7 @@ ssize_t file_size(char * filename, void * helper) {
    FILE * dir = ((Help*)helper)->directory_table;
    int size = ((Help*)helper)->dir_size/72;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
       fseek(dir,72*i,SEEK_SET);
@@ -1125,7 +1125,7 @@ int resize_fileNoLock(char * filename, size_t length, void * helper){
    int size = ((Help*)helper)->dir_size/72;
    unsigned int lll = (unsigned int)length;
    char truncated[64];
-   truncate(filename,truncated);
+   truncateIt(filename,truncated);
    int position = -1;
    int valueLength = -1;
    int valueOffset = -1;
