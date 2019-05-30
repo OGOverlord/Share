@@ -36,6 +36,7 @@ int file_exists(const char* filename, void* helper){
    fseek(dir, 0, SEEK_END);
    size = ftell(dir);
    char truncated[64];
+   char* a = (char*) filename;
    truncateIt(filename,truncated);
    for(int i = 0; i< size; i++){
       char name[64];
@@ -61,7 +62,8 @@ int myfuse_getattr(const char * name, struct stat * result) {
     } else {
         result->st_mode = S_IFREG;
         char* buf[1];
-        if( file_exists(name+1,helper)==0 ){
+        const char* a = name+1;
+        if( file_exists(a,helper)==0 ){
            return 0;
         }else{
            return -ENOENT;
