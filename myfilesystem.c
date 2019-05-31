@@ -100,26 +100,26 @@ void close_fs(void * helper) {
 
 void writeThreads(char* input, int count, int bytenum, FILE * fileptr, void * structure, int start){
    Help * helper = (Help*) structure;
-   printf("writeThreads %d\n", helper->threads_max);
+   // printf("writeThreads %d\n", helper->threads_max);
    if(helper->threads_max>1){
       int parts = count/(helper->threads_max);
+      // printf("parts is %d\n", parts);
       int threads = 0;
       while(threads<(helper->threads_max)-1){
          pid_t pid = fork();
          if(pid!=0){
             fseek(fileptr, start+threads*parts,SEEK_SET);
-            fwrite(input+threads*parts,threads*parts,1,fileptr);
+            fwrite(input+threads*parts, parts,1,fileptr);
             fflush(fileptr);
             // close_fs(helper);
             // exit(0);
             kill(pid,SIGKILL);
-         }else if(threads==0){
-            fseek(fileptr,start+((helper->threads_max)-1)*parts,SEEK_SET);
-            fwrite(input+((helper->threads_max)-1)*parts,count-(((helper->threads_max)-1)*parts),1,fileptr);
-            fflush(fileptr);
          }
          threads++;
       }
+      fseek(fileptr,start+((helper->threads_max)-1)*parts,SEEK_SET);
+      fwrite(input+((helper->threads_max)-1)*parts,count-((helper->threads_max)-1)*parts,1,fileptr);
+      fflush(fileptr);
    }else{
       fseek(fileptr,start,SEEK_SET);
       fwrite(input,count,1,fileptr);
@@ -812,16 +812,16 @@ int write_file(char * filename, size_t offset, size_t count, void * buf, void * 
          }
          if(repackyes==false){
             // printf("why is this hapening multiple times\n");
-            // writeThreads(test, count, 1, files, helper, fileOffset+offset);
+            writeThreads(test, count, 1, files, helper, fileOffset+offset);
 
-            fseek(files,fileOffset+offset,SEEK_SET);
+            // fseek(files,fileOffset+offset,SEEK_SET);
             /*
             I should make use of threads here, to write into the file, fflush, then fclose(). and exit(0)
 
             */
 
-            fwrite(test,count,1,files);
-            fflush(files);
+            // fwrite(test,count,1,files);
+            // fflush(files);
             // fseek(dir,208,SEEK_SET);
             // fread(&test,1,1,dir);
             compute_hash_treeNoLock(helper);
