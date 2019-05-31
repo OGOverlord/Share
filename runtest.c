@@ -57,6 +57,13 @@ int writing(){
    close_fs(helper);
    return ret;
 }
+
+int test(){
+   return 0;
+
+}
+
+
 /****************************/
 
 /* Helper function */
